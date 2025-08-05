@@ -24,7 +24,6 @@ a discussion of the experimental results (e.g., what is the performance that you
 ## Our Approach :
 
 At first, Using a Linear Regression and `excluding` the unrated movies (Rating == 0) we obtained :
-
 ```
 📊 Validation R2: 0.05239199004077433
 ----------------------
@@ -34,9 +33,33 @@ At first, Using a Linear Regression and `excluding` the unrated movies (Rating =
 ----------------------
 📉 Test MSE: 3.7099452036246263
 ----------------------
+```
 
 With few examples -> only train on a subset of the data, less statistical power
-When target variance shrinks, R² naturally drops if the model can’t explain much variation 
+When target variance shrinks, R2 naturally drops if the model handle much variation 
+
+Using a Linear Regression model `including` unrated we achieved the following results:
+```
+📊 Validation R2: 0.48586217330126347
+----------------------
+📊 Test R2: 0.4883999483580138
+----------------------
+📉 Validation MSE: 4.4539062880351
+----------------------
+📉 Test MSE: 4.418847851586559
+----------------------
+```
+
+Implementing a Ridge Regression model we achieved the following results:
+```
+📊 Validation R2: 0.48664158818283676
+----------------------
+📊 Test R2: 0.49493691522476735
+----------------------
+📉 Validation MSE: 4.4553966021437255
+----------------------
+📉 Test MSE: 4.370727223787257
+
 ```
 
 Trying out Lasso Regression, we obtained the results:
