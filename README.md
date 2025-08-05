@@ -62,6 +62,22 @@ Implementing a Ridge Regression model we achieved the following results:
 
 ```
 
+#### ! Using a Linear Regression model with Polynomial Features we achieved the following results:
+`Note` : We did not use Polynomials for all features, as it would lead to a very high power consumption.
+**The features we used** ['vote_count_log', 'budget_scaled', 'revenue_scaled', 'runtime_scaled', 'popularity_scaled'] `
+```
+📊 Validation R2: 0.682862375791018
+----------------------
+📊 Test R2: 0.6661081283617595
+----------------------
+📉 Validation MSE: 2.7514282784156125
+----------------------
+📉 Test MSE: 2.8967269006055836
+----------------------
+
+
+```
+
 Trying out Lasso Regression, we obtained the results:
 ```
 - Train MSE: 4.6666
