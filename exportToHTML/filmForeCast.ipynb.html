@@ -1,0 +1,585 @@
+<html>
+<head>
+<title>filmForeCast.ipynb</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #5e81ac;}
+.s1 { color: #d8dee9;}
+.s2 { color: #81a1c1;}
+.s3 { color: #eceff4;}
+.s4 { color: #a3be8c;}
+.s5 { color: #ebcb8b;}
+.s6 { color: #616e88;}
+.s7 { color: #b48ead;}
+.ls0 { height: 1px; border-width: 0; color: #d8dee9; background-color:#d8dee9}
+</style>
+</head>
+<body bgcolor="#2e3440">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+filmForeCast.ipynb</font>
+</center></td></tr></table>
+<pre><span class="s0">#%% md 
+</span><span class="s1"># FilmForecast 
+## Project aiming at Predicting Movie Ratings using Methods of Machine Learning 
+ 
+### Topic : Predict the Rating of Movies 
+ 
+#### by: 
+#### Valentin Straßer (Matrikelnummer: 5014379), 
+#### Mathusan Saravanapavan (Matrikelnummer: 5012824), 
+#### Michał Roziel (Matrikelnummer: 5012845) <hr class="ls0"></span><span class="s0">#%% md 
+</span><span class="s1">#### The goal in this project is to predict the rating (vote_average) of movies based on other features (e.g., their release date and box-office revenue). 
+ <hr class="ls0"></span><span class="s0">#%% md 
+</span><span class="s1">#### Data : 
+ 
+The TMDB Movies Dataset consists of information about 1 million movies scraped from IMDB. The dataset is available for download from Moodle. More information about the dataset can be found here: 
+ 
+https://www.kaggle.com/datasets/asaniczka/tmdb-movies-dataset-2023-930k-movies/data 
+ <hr class="ls0"></span><span class="s0">#%% md 
+</span><span class="s1">#### Goals : 
+ 
+Employing the methods that we covered in the lecture, you should come up with your own solution to the problem and evaluate it. In order to obtain bonus points, you have to submit your solution as a single Jupyter Notebook by August 30, 2025. Your Jupyter notebook should cover the following aspects: 
+ 
+some analysis of the dataset (e.g., statistics regarding its size or the distribution of individual features) 
+details on any preprocessing that you applied to the dataset (e.g., to clean it up by removing null values) 
+a detailed description of your approach (e.g., which method to do you use, which features do you consider) 
+a discussion of the experimental results (e.g., what is the performance that your achieves, how does it compare to other methods) 
+ <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s2">import </span><span class="s1">pandas </span><span class="s2">as </span><span class="s1">pd</span>
+<span class="s2">import </span><span class="s1">numpy </span><span class="s2">as </span><span class="s1">np</span>
+<span class="s2">from </span><span class="s1">sklearn</span><span class="s3">.</span><span class="s1">preprocessing </span><span class="s2">import </span><span class="s1">MinMaxScaler</span><span class="s3">, </span><span class="s1">PolynomialFeatures</span>
+<span class="s2">from </span><span class="s1">sklearn</span><span class="s3">.</span><span class="s1">model_selection </span><span class="s2">import </span><span class="s1">train_test_split</span>
+<span class="s2">from </span><span class="s1">sklearn</span><span class="s3">.</span><span class="s1">linear_model </span><span class="s2">import </span><span class="s1">LinearRegression</span><span class="s3">, </span><span class="s1">Ridge</span>
+<span class="s2">from </span><span class="s1">sklearn</span><span class="s3">.</span><span class="s1">metrics </span><span class="s2">import </span><span class="s1">mean_squared_error</span><span class="s3">, </span><span class="s1">r2_score</span>
+
+<span class="s1">df </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">read_csv</span><span class="s3">(</span><span class="s4">&quot;../Database/Dataset.csv&quot;</span><span class="s3">)</span>
+<span class="s1">df_raw </span><span class="s2">= </span><span class="s1">df</span><span class="s3">.</span><span class="s1">copy</span><span class="s3">()</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Original DataFrame:&quot;</span><span class="s3">, </span><span class="s1">df</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Feature in the Dataset: </span><span class="s5">\n</span><span class="s4">&quot;</span><span class="s3">, </span><span class="s1">df</span><span class="s3">.</span><span class="s1">columns</span><span class="s3">.</span><span class="s1">tolist</span><span class="s3">())</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">### 1. Analysis of the Dataset 
+ 
+**Data soure.** We use the TMDB movies dataset, which contains over 1000000 rows and 24 columns 
+ 
+#### Missing values : 
+ 
+- We apply a **50% missing-value threshold**: columns with ≥50% nulls are dropped because they would add noise and unstable signals. 
+- Dropped columns: `keywords`, `homepage`, `backdrop_path`, `production_companies`, `tagline`. 
+- Resulting shape: **19 cols**. 
+ 
+#### Feature Distribution : 
+- The target variable, `vote_average`, is a continuous variable, which lets us identify this problem as a regression problem. 
+- Some Features have skewness and need to be Scaled or refactored. 
+- Some cols like `genres` are in a JSON-like format and need to be parsed to be usable as features. 
+- Some features like `original_language` can be one-hot encoded. 
+ <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s6"># Initial Data Cleaning - Remove Cols with too Many Null Values.</span>
+
+<span class="s6"># 1. Set a threshold for null values (50%).</span>
+<span class="s6"># Columns with more null values than the threshold will be dropped.</span>
+<span class="s1">threshold </span><span class="s2">= </span><span class="s1">len</span><span class="s3">(</span><span class="s1">df</span><span class="s3">) </span><span class="s2">* </span><span class="s7">0.5</span>
+
+<span class="s6"># Count null values for each column.</span>
+<span class="s1">null_counts </span><span class="s2">= </span><span class="s1">df</span><span class="s3">.</span><span class="s1">isnull</span><span class="s3">().</span><span class="s1">sum</span><span class="s3">()</span>
+
+
+<span class="s6"># 2. Identify columns where the null count exceeds the threshold.</span>
+<span class="s1">cols_to_drop </span><span class="s2">= </span><span class="s1">null_counts</span><span class="s3">[</span><span class="s1">null_counts </span><span class="s2">&gt; </span><span class="s1">threshold</span><span class="s3">].</span><span class="s1">index</span><span class="s3">.</span><span class="s1">tolist</span><span class="s3">()</span>
+
+
+
+<span class="s6"># Check which columns were dropped.</span>
+<span class="s6"># Use set difference to find the dropped columns.</span>
+<span class="s1">dropped_cols </span><span class="s2">= </span><span class="s1">set</span><span class="s3">(</span><span class="s1">df_raw</span><span class="s3">.</span><span class="s1">columns</span><span class="s3">) </span><span class="s2">- </span><span class="s1">set</span><span class="s3">(</span><span class="s1">df</span><span class="s3">.</span><span class="s1">columns</span><span class="s3">)</span>
+
+<span class="s6"># 3. Drop the identified columns.</span>
+<span class="s1">df </span><span class="s2">= </span><span class="s1">df</span><span class="s3">.</span><span class="s1">drop</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">cols_to_drop</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Dropped columns:&quot;</span><span class="s3">, </span><span class="s1">dropped_cols</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Original shape:&quot;</span><span class="s3">, </span><span class="s1">df_raw</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Cleaned shape:&quot;</span><span class="s3">, </span><span class="s1">df</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+
+
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Remaining columns:&quot;</span><span class="s3">, </span><span class="s1">df</span><span class="s3">.</span><span class="s1">columns</span><span class="s3">.</span><span class="s1">tolist</span><span class="s3">())</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">#### Dropping Unnecessary or Redundant Columns 
+ 
+Before building the model, we remove several columns that are not useful for predicting the `vote_average`: 
+*   **Identifiers**: `id`, `imdb_id`, `title`, `original_title` are unique to each movie. 
+*   **target**: `vote_average` is our target variable, so it must be separated. 
+ <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s6"># Second Data Cleaning</span>
+<span class="s6"># Drop columns that are not needed for the model, we cannot predict the rating from cols like title, id, etc. .</span>
+
+<span class="s6">#------------------------------</span>
+<span class="s1">cols_to_drop_for_model </span><span class="s2">= </span><span class="s3">[</span>
+    <span class="s4">'id'</span><span class="s3">,</span>
+    <span class="s4">'title'</span><span class="s3">,</span>
+    <span class="s4">'original_title'</span><span class="s3">,</span>
+    <span class="s4">'imdb_id'</span><span class="s3">,</span>
+    <span class="s4">'poster_path'</span><span class="s3">,</span>
+    <span class="s4">'overview'</span><span class="s3">,  </span><span class="s6">#We would keep this, but we cannot use methods like NLP.</span>
+    <span class="s4">'vote_average'</span><span class="s3">,</span>
+    <span class="s4">'production_countries'</span><span class="s3">,</span>
+    <span class="s4">'spoken_languages'</span>
+<span class="s3">]</span>
+<span class="s6">#------------------------------</span>
+
+<span class="s6">#------------------------------</span>
+<span class="s1">features </span><span class="s2">= </span><span class="s1">df</span><span class="s3">.</span><span class="s1">drop</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">cols_to_drop_for_model</span><span class="s3">)</span>
+<span class="s1">target </span><span class="s2">= </span><span class="s1">df</span><span class="s3">[</span><span class="s4">'vote_average'</span><span class="s3">]</span>
+<span class="s6">#------------------------------</span>
+
+<span class="s6">#------------------------------</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Original DataFrame:&quot;</span><span class="s3">, </span><span class="s1">df</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Features DataFrame:&quot;</span><span class="s3">, </span><span class="s1">features</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;The Features we are going to be using:</span><span class="s5">\n</span><span class="s4">&quot;</span><span class="s3">, </span><span class="s1">features</span><span class="s3">.</span><span class="s1">columns</span><span class="s3">.</span><span class="s1">tolist</span><span class="s3">())</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s6">#------------------------------</span>
+<hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">### 2. Preprocessing and Feature Engineering 
+ 
+Before training out model we are going to Feature Engineer our data Frame. 
+ 
+#### Feature Selection : 
+- Columns not relevant for prediction were dropped to create the feature set. The target variable `vote_average` was separated. 
+ 
+- Handling JSON-like Columns (`genres`) : 
+  - We extracted the genre name with a `has_` prefix 
+ 
+ 
+#### Feature Transformation and Scaling : 
+ 
+- Logarithmic Scaling : because of broad distribution and skewness of  `vote_count`, we applied a logarithmic transformation. 
+ 
+#### Scaling : 
+- `MinMaxScaler` was used to scale `budget`, `revenue` 
+- Normatlization was applied to `budget`, `revenue` 
+ 
+#### Missing values : 
+- In `runtime` we filled with the median, while `budget` and `revenue` not a number (NaNs) were filled with 0. 
+- Date Feature Extraction : The year and month were extracted from the release_date column to create release_year and release_month features 
+ 
+#### Categorical Feature Encoding : 
+- Status : The `status` column was converted into a binary feature `status_released`. 
+- Original Language : The `original_language` column was converted using one-hot encoding (`pd.get_dummies`). 
+- Adult : The boolean `adult` column was converted to an binary choice. 
+- Final Feature Set : The final set of features created by engineering. Any remaining `NaN` values  were filled with 0. <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s6"># Split Data into Training, Validation, and Test Sets</span>
+<span class="s6"># We will use 70% for training, 20% for validation, and 10% for testing.</span>
+<span class="s6"># We are first splitting the data in to three sets, and then we apply the Feature Eng. function.</span>
+<span class="s6"># We do this to avoid data leakage.</span>
+<span class="s6">#https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html</span>
+
+
+<span class="s6"># Splitting the Data into train and temporary sets (70% train, 30% temp).</span>
+<span class="s6"># Using train_test_split from SCIKIT LEARN</span>
+<span class="s1">X_train</span><span class="s3">, </span><span class="s1">X_temp</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">, </span><span class="s1">y_temp </span><span class="s2">= </span><span class="s1">train_test_split</span><span class="s3">(</span>
+    <span class="s6"># X_train : features</span>
+    <span class="s6"># X_temp : also features, 30% of the data</span>
+    <span class="s6"># y_train : target</span>
+    <span class="s6"># y_temp : still 30% of the data, but not features -&gt; target values</span>
+    <span class="s1">features</span><span class="s3">, </span><span class="s1">target</span><span class="s3">,</span>
+    <span class="s1">test_size</span><span class="s2">=</span><span class="s7">0.30</span><span class="s3">,</span>
+    <span class="s1">random_state</span><span class="s2">=</span><span class="s7">42 </span><span class="s3">) </span><span class="s6">#Random state -&gt; splitting always the same</span>
+
+<span class="s6"># Splitting the Temp set into validation and test sets</span>
+<span class="s1">X_val</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">, </span><span class="s1">y_val</span><span class="s3">, </span><span class="s1">y_test </span><span class="s2">= </span><span class="s1">train_test_split</span><span class="s3">(</span>
+    <span class="s1">X_temp</span><span class="s3">, </span><span class="s1">y_temp</span><span class="s3">,</span>
+    <span class="s1">test_size</span><span class="s2">=</span><span class="s7">1</span><span class="s2">/</span><span class="s7">3</span><span class="s3">,</span>
+    <span class="s1">random_state</span><span class="s2">=</span><span class="s7">42 </span><span class="s3">)</span>
+
+<span class="s6"># Display the shapes of the resulting splits to confirm.</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Training features shape:&quot;</span><span class="s3">, </span><span class="s1">X_train</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Validation features shape:&quot;</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Test features shape:&quot;</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Training target shape:&quot;</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Validation target shape:&quot;</span><span class="s3">, </span><span class="s1">y_val</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Test target shape:&quot;</span><span class="s3">, </span><span class="s1">y_test</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># Scalers for RUNTIME / BUDGET / REVENUE / POPULARITY</span>
+<span class="s1">scaler_runtime </span><span class="s2">= </span><span class="s1">MinMaxScaler</span><span class="s3">()</span>
+<span class="s1">scaler_br </span><span class="s2">= </span><span class="s1">MinMaxScaler</span><span class="s3">()</span>
+<span class="s1">scaler_pop </span><span class="s2">= </span><span class="s1">MinMaxScaler</span><span class="s3">()</span>
+
+<span class="s2">def </span><span class="s1">feature_engineer</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">)</span><span class="s2">:</span>
+
+  <span class="s6">#  We Apply feature engineering to the sets :TRAIN, VAL, TEST</span>
+
+
+    <span class="s6"># Create copies to avoid modifying the original DataFrames</span>
+    <span class="s1">x_train_eng </span><span class="s2">= </span><span class="s1">X_train</span><span class="s3">.</span><span class="s1">copy</span><span class="s3">()</span>
+    <span class="s1">x_val_eng </span><span class="s2">= </span><span class="s1">X_val</span><span class="s3">.</span><span class="s1">copy</span><span class="s3">()</span>
+    <span class="s1">x_test_eng </span><span class="s2">= </span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">copy</span><span class="s3">()</span>
+
+    <span class="s6"># --- Transformations we are going to use ---</span>
+    <span class="s2">for </span><span class="s1">df_split </span><span class="s2">in </span><span class="s3">[</span><span class="s1">x_train_eng</span><span class="s3">, </span><span class="s1">x_val_eng</span><span class="s3">, </span><span class="s1">x_test_eng</span><span class="s3">]</span><span class="s2">:</span>
+
+        <span class="s6">#------------------------------</span>
+        <span class="s6"># Convert VOTE_COUNT using logarithmic scaling</span>
+        <span class="s6"># prevents extreme large values</span>
+        <span class="s6"># Log transform VOTE_COUNT</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'vote_count_log'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">log1p</span><span class="s3">(</span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'vote_count'</span><span class="s3">])</span>
+        <span class="s6">#------------------------------</span>
+
+
+        <span class="s6">#------------------------------</span>
+        <span class="s6"># One-hot encode 'status'</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'status_released'</span><span class="s3">] </span><span class="s2">= </span><span class="s3">(</span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'status'</span><span class="s3">] </span><span class="s2">== </span><span class="s4">'Released'</span><span class="s3">).</span><span class="s1">astype</span><span class="s3">(</span><span class="s1">int</span><span class="s3">)</span>
+        <span class="s6"># By Far the majority of movies are Released -&gt; Binary Choice</span>
+        <span class="s6"># 1 : Released, 0 : Not Released</span>
+        <span class="s6">#------------------------------</span>
+
+
+        <span class="s6">#------------------------------</span>
+        <span class="s6"># Convert 'release_date' to datetime and extract YEAR and MONTH</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_date'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">to_datetime</span><span class="s3">(</span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_date'</span><span class="s3">], </span><span class="s1">errors</span><span class="s2">=</span><span class="s4">'coerce'</span><span class="s3">)</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_year'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_date'</span><span class="s3">].</span><span class="s1">dt</span><span class="s3">.</span><span class="s1">year</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_month'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_date'</span><span class="s3">].</span><span class="s1">dt</span><span class="s3">.</span><span class="s1">month</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_year'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'release_year'</span><span class="s3">].</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">upper</span><span class="s2">=</span><span class="s7">2025</span><span class="s3">, </span><span class="s1">lower</span><span class="s2">=</span><span class="s7">1900</span><span class="s3">)</span>
+        <span class="s6">#------------------------------</span>
+
+
+        <span class="s6">#------------------------------</span>
+        <span class="s6"># Convert ADULT to binary (1 for True, 0 for False).</span>
+        <span class="s6"># This is statistically relevant, as almost 10% of movies are for adults.</span>
+        <span class="s6"># Convert ADULT to binary</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'adult'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'adult'</span><span class="s3">].</span><span class="s1">astype</span><span class="s3">(</span><span class="s1">bool</span><span class="s3">).</span><span class="s1">astype</span><span class="s3">(</span><span class="s1">int</span><span class="s3">)</span>
+        <span class="s6">#------------------------------</span>
+
+        <span class="s6">#------------------------------</span>
+        <span class="s6"># GENRES : (clean comma+space separated) -&gt; one-hot &quot;has_*&quot; columns</span>
+        <span class="s1">genre_dummies </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'genres'</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s4">''</span><span class="s3">).</span><span class="s1">str</span><span class="s3">.</span><span class="s1">get_dummies</span><span class="s3">(</span><span class="s1">sep</span><span class="s2">=</span><span class="s4">', '</span><span class="s3">).</span><span class="s1">add_prefix</span><span class="s3">(</span><span class="s4">'has_'</span><span class="s3">)</span>
+        <span class="s2">for </span><span class="s1">col </span><span class="s2">in </span><span class="s1">genre_dummies</span><span class="s3">.</span><span class="s1">columns</span><span class="s2">:</span>
+            <span class="s1">df_split</span><span class="s3">[</span><span class="s1">col</span><span class="s3">] </span><span class="s2">= </span><span class="s1">genre_dummies</span><span class="s3">[</span><span class="s1">col</span><span class="s3">]</span>
+        <span class="s6">#------------------------------</span>
+
+    <span class="s6"># --- Fit on training data, then transform all sets ---</span>
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># Convert RUNTIME to numeric, fill NaN with median.</span>
+    <span class="s1">runtime_median </span><span class="s2">= </span><span class="s1">x_train_eng</span><span class="s3">[</span><span class="s4">'runtime'</span><span class="s3">].</span><span class="s1">median</span><span class="s3">()</span>
+    <span class="s2">for </span><span class="s1">df_split </span><span class="s2">in </span><span class="s3">[</span><span class="s1">x_train_eng</span><span class="s3">, </span><span class="s1">x_val_eng</span><span class="s3">, </span><span class="s1">x_test_eng</span><span class="s3">]</span><span class="s2">:</span>
+        <span class="s6"># FIX: Avoid inplace=True</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'runtime'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'runtime'</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s1">runtime_median</span><span class="s3">)</span>
+    <span class="s6">#------------------------------</span>
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># We are Scaling the three RUNTIME sets</span>
+    <span class="s1">x_train_eng</span><span class="s3">[</span><span class="s4">'runtime_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_runtime</span><span class="s3">.</span><span class="s1">fit_transform</span><span class="s3">(</span><span class="s1">x_train_eng</span><span class="s3">[[</span><span class="s4">'runtime'</span><span class="s3">]])</span>
+    <span class="s1">x_val_eng</span><span class="s3">[</span><span class="s4">'runtime_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_runtime</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_val_eng</span><span class="s3">[[</span><span class="s4">'runtime'</span><span class="s3">]])</span>
+    <span class="s1">x_test_eng</span><span class="s3">[</span><span class="s4">'runtime_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_runtime</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_test_eng</span><span class="s3">[[</span><span class="s4">'runtime'</span><span class="s3">]])</span>
+    <span class="s6">#------------------------------</span>
+
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># FILL missing BUDGET and REVENUE</span>
+    <span class="s2">for </span><span class="s1">df_split </span><span class="s2">in </span><span class="s3">[</span><span class="s1">x_train_eng</span><span class="s3">, </span><span class="s1">x_val_eng</span><span class="s3">, </span><span class="s1">x_test_eng</span><span class="s3">]</span><span class="s2">:</span>
+        <span class="s6"># FIX: Avoid inplace=True</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'budget'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'budget'</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s7">0</span><span class="s3">)</span>
+        <span class="s1">df_split</span><span class="s3">[</span><span class="s4">'revenue'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">df_split</span><span class="s3">[</span><span class="s4">'revenue'</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s7">0</span><span class="s3">)</span>
+
+    <span class="s6"># Scale BUDGET and REVENUE between 0 and 1.</span>
+    <span class="s1">x_train_eng</span><span class="s3">[[</span><span class="s4">'budget_scaled'</span><span class="s3">, </span><span class="s4">'revenue_scaled'</span><span class="s3">]] </span><span class="s2">= </span><span class="s1">scaler_br</span><span class="s3">.</span><span class="s1">fit_transform</span><span class="s3">(</span><span class="s1">x_train_eng</span><span class="s3">[[</span><span class="s4">'budget'</span><span class="s3">, </span><span class="s4">'revenue'</span><span class="s3">]])</span>
+    <span class="s1">x_val_eng</span><span class="s3">[[</span><span class="s4">'budget_scaled'</span><span class="s3">, </span><span class="s4">'revenue_scaled'</span><span class="s3">]] </span><span class="s2">= </span><span class="s1">scaler_br</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_val_eng</span><span class="s3">[[</span><span class="s4">'budget'</span><span class="s3">, </span><span class="s4">'revenue'</span><span class="s3">]])</span>
+    <span class="s1">x_test_eng</span><span class="s3">[[</span><span class="s4">'budget_scaled'</span><span class="s3">, </span><span class="s4">'revenue_scaled'</span><span class="s3">]] </span><span class="s2">= </span><span class="s1">scaler_br</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_test_eng</span><span class="s3">[[</span><span class="s4">'budget'</span><span class="s3">, </span><span class="s4">'revenue'</span><span class="s3">]])</span>
+    <span class="s6">#------------------------------</span>
+
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># Scale 'popularity'</span>
+    <span class="s1">x_train_eng</span><span class="s3">[</span><span class="s4">'popularity_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_pop</span><span class="s3">.</span><span class="s1">fit_transform</span><span class="s3">(</span><span class="s1">x_train_eng</span><span class="s3">[[</span><span class="s4">'popularity'</span><span class="s3">]])</span>
+    <span class="s1">x_val_eng</span><span class="s3">[</span><span class="s4">'popularity_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_pop</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_val_eng</span><span class="s3">[[</span><span class="s4">'popularity'</span><span class="s3">]])</span>
+    <span class="s1">x_test_eng</span><span class="s3">[</span><span class="s4">'popularity_scaled'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">scaler_pop</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_test_eng</span><span class="s3">[[</span><span class="s4">'popularity'</span><span class="s3">]])</span>
+    <span class="s6">#------------------------------</span>
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># One-hot encode 'original_language'</span>
+    <span class="s1">x_train_eng </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">get_dummies</span><span class="s3">(</span><span class="s1">x_train_eng</span><span class="s3">, </span><span class="s1">columns</span><span class="s2">=</span><span class="s3">[</span><span class="s4">'original_language'</span><span class="s3">], </span><span class="s1">prefix</span><span class="s2">=</span><span class="s4">'lang'</span><span class="s3">, </span><span class="s1">drop_first</span><span class="s2">=True</span><span class="s3">)</span>
+    <span class="s1">x_val_eng </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">get_dummies</span><span class="s3">(</span><span class="s1">x_val_eng</span><span class="s3">, </span><span class="s1">columns</span><span class="s2">=</span><span class="s3">[</span><span class="s4">'original_language'</span><span class="s3">], </span><span class="s1">prefix</span><span class="s2">=</span><span class="s4">'lang'</span><span class="s3">, </span><span class="s1">drop_first</span><span class="s2">=True</span><span class="s3">)</span>
+    <span class="s1">x_test_eng </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">get_dummies</span><span class="s3">(</span><span class="s1">x_test_eng</span><span class="s3">, </span><span class="s1">columns</span><span class="s2">=</span><span class="s3">[</span><span class="s4">'original_language'</span><span class="s3">], </span><span class="s1">prefix</span><span class="s2">=</span><span class="s4">'lang'</span><span class="s3">, </span><span class="s1">drop_first</span><span class="s2">=True</span><span class="s3">)</span>
+    <span class="s6">#------------------------------</span>
+
+    <span class="s6"># --- //FIX: Align columns - -fix ---</span>
+    <span class="s6"># https://stackoverflow.com/questions/37981678/</span>
+    <span class="s1">train_cols </span><span class="s2">= </span><span class="s1">x_train_eng</span><span class="s3">.</span><span class="s1">columns</span>
+    <span class="s1">x_val_eng </span><span class="s2">= </span><span class="s1">x_val_eng</span><span class="s3">.</span><span class="s1">reindex</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">train_cols</span><span class="s3">, </span><span class="s1">fill_value</span><span class="s2">=</span><span class="s7">0</span><span class="s3">)</span>
+    <span class="s1">x_test_eng </span><span class="s2">= </span><span class="s1">x_test_eng</span><span class="s3">.</span><span class="s1">reindex</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">train_cols</span><span class="s3">, </span><span class="s1">fill_value</span><span class="s2">=</span><span class="s7">0</span><span class="s3">)</span>
+    <span class="s6"># --- //FIX ---</span>
+
+    <span class="s6"># --- Define  feature columns for GENRE and LANGUAGE ---</span>
+    <span class="s1">genre_features </span><span class="s2">= </span><span class="s3">[</span><span class="s1">col </span><span class="s2">for </span><span class="s1">col </span><span class="s2">in </span><span class="s1">x_train_eng</span><span class="s3">.</span><span class="s1">columns </span><span class="s2">if </span><span class="s1">col</span><span class="s3">.</span><span class="s1">startswith</span><span class="s3">(</span><span class="s4">'has_'</span><span class="s3">)]</span>
+    <span class="s1">lang_features </span><span class="s2">= </span><span class="s3">[</span><span class="s1">col </span><span class="s2">for </span><span class="s1">col </span><span class="s2">in </span><span class="s1">x_train_eng</span><span class="s3">.</span><span class="s1">columns </span><span class="s2">if </span><span class="s1">col</span><span class="s3">.</span><span class="s1">startswith</span><span class="s3">(</span><span class="s4">'lang_'</span><span class="s3">)]</span>
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># FINAL FEATURE COLUMNS</span>
+    <span class="s6">#------------------------------</span>
+    <span class="s1">feature_cols </span><span class="s2">= </span><span class="s3">[</span>
+        <span class="s4">'vote_count_log'</span><span class="s3">, </span><span class="s4">'status_released'</span><span class="s3">, </span><span class="s4">'release_year'</span><span class="s3">, </span><span class="s4">'release_month'</span><span class="s3">,</span>
+        <span class="s4">'budget_scaled'</span><span class="s3">, </span><span class="s4">'revenue_scaled'</span><span class="s3">, </span><span class="s4">'runtime_scaled'</span><span class="s3">,</span>
+        <span class="s4">'adult'</span><span class="s3">, </span><span class="s4">'popularity_scaled'</span>
+    <span class="s3">] </span><span class="s2">+ </span><span class="s1">genre_features </span><span class="s2">+ </span><span class="s1">lang_features</span>
+    <span class="s6">#------------------------------</span>
+
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># if still missing values, fill with 0</span>
+    <span class="s6">#------------------------------</span>
+    <span class="s6"># Select and fill any remaining NaNs in the final feature sets</span>
+    <span class="s1">x_train_final </span><span class="s2">= </span><span class="s1">x_train_eng</span><span class="s3">[</span><span class="s1">feature_cols</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s7">0</span><span class="s3">)</span>
+    <span class="s1">x_val_final </span><span class="s2">= </span><span class="s1">x_val_eng</span><span class="s3">[</span><span class="s1">feature_cols</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s7">0</span><span class="s3">)</span>
+    <span class="s1">x_test_final </span><span class="s2">= </span><span class="s1">x_test_eng</span><span class="s3">[</span><span class="s1">feature_cols</span><span class="s3">].</span><span class="s1">fillna</span><span class="s3">(</span><span class="s7">0</span><span class="s3">)</span>
+    <span class="s6">#------------------------------</span>
+
+    <span class="s2">return </span><span class="s1">x_train_final</span><span class="s3">, </span><span class="s1">x_val_final</span><span class="s3">, </span><span class="s1">x_test_final</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># Apply the function to your data splits</span>
+<span class="s1">X_train</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">, </span><span class="s1">X_test </span><span class="s2">= </span><span class="s1">feature_engineer</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">)</span>
+
+<span class="s6"># Display the shape of the processed data to confirm</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Processed training features shape:&quot;</span><span class="s3">, </span><span class="s1">X_train</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Processed validation features shape:&quot;</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Processed test features shape:&quot;</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">### 3.  modeling Scenarios 
+ 
+ 
+ 
+The following models were considered: 
+1.  **Linear Regression** 
+2.  **Ridge Regression** 
+3.  **Polynomial Regression** 
+ 
+ <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Training set shape:&quot;</span><span class="s3">,  </span><span class="s1">X_train</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Validation set shape:&quot;</span><span class="s3">, </span><span class="s1">X_val</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Test set shape:&quot;</span><span class="s3">, </span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Training target shape:&quot;</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Validation target shape:&quot;</span><span class="s3">, </span><span class="s1">y_val</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;Test target shape:&quot;</span><span class="s3">, </span><span class="s1">y_test</span><span class="s3">.</span><span class="s1">shape</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># Check for missing values</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;NaNs in features:&quot;</span><span class="s3">, </span><span class="s1">features</span><span class="s3">.</span><span class="s1">isna</span><span class="s3">().</span><span class="s1">sum</span><span class="s3">().</span><span class="s1">sum</span><span class="s3">())</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;NaNs in target:&quot;</span><span class="s3">, </span><span class="s1">target</span><span class="s3">.</span><span class="s1">isna</span><span class="s3">().</span><span class="s1">sum</span><span class="s3">())</span>
+<span class="s1">print</span><span class="s3">(</span><span class="s4">&quot;----------------------------------------&quot;</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># FUNCTION FOR LINEAR REGRESSION</span>
+<span class="s6">#https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html</span>
+<span class="s2">def </span><span class="s1">execute_linear_regression</span><span class="s3">()</span><span class="s2">:</span>
+    <span class="s6"># Initialize model</span>
+    <span class="s1">model </span><span class="s2">= </span><span class="s1">LinearRegression</span><span class="s3">()</span>
+
+    <span class="s6"># Train model</span>
+    <span class="s1">model</span><span class="s3">.</span><span class="s1">fit</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">)</span>
+
+    <span class="s6"># Predictions</span>
+    <span class="s1">y_train_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">)</span>
+    <span class="s1">y_val_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_val</span><span class="s3">)</span>
+    <span class="s1">y_test_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_test</span><span class="s3">)</span>
+
+    <span class="s6"># Return predictions and model</span>
+    <span class="s2">return </span><span class="s1">y_train_pred</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">, </span><span class="s1">y_test_pred</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># FUNCTION FOR RIDGE REGRESSION</span>
+<span class="s2">def </span><span class="s1">execute_ridge_regression</span><span class="s3">()</span><span class="s2">:</span>
+    <span class="s6"># Initialize the model with a default alpha</span>
+    <span class="s1">model </span><span class="s2">= </span><span class="s1">Ridge</span><span class="s3">(</span><span class="s1">random_state</span><span class="s2">=</span><span class="s7">42</span><span class="s3">)</span>
+
+    <span class="s6"># Train the model</span>
+    <span class="s1">model</span><span class="s3">.</span><span class="s1">fit</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">)</span>
+
+    <span class="s6"># Make predictions</span>
+    <span class="s1">y_train_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_train</span><span class="s3">)</span>
+    <span class="s1">y_val_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_val</span><span class="s3">)</span>
+    <span class="s1">y_test_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">X_test</span><span class="s3">)</span>
+
+    <span class="s2">return </span><span class="s1">y_train_pred</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">, </span><span class="s1">y_test_pred</span><hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">#### Polynomial Regression Strategy 
+ 
+For the Polynomial Regression model : 
+*   **Targeted Transformation**: We create polynomial features only from a subset of our features. 
+      - for all Feature: High computation time. 
+*   **Combining Features**: After creating the polynomial features, we add them back with to other features. <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s6"># FUNCTION FOR POLYNOMIAL REGRESSION</span>
+<span class="s2">def </span><span class="s1">execute_polynomial_regression</span><span class="s3">()</span><span class="s2">:</span>
+
+    <span class="s6"># Initialize model.</span>
+    <span class="s1">model </span><span class="s2">= </span><span class="s1">LinearRegression</span><span class="s3">()</span>
+
+    <span class="s6"># Select numeric features for polynomial transform.</span>
+    <span class="s1">numeric_features </span><span class="s2">= </span><span class="s3">[</span><span class="s4">'vote_count_log'</span><span class="s3">, </span><span class="s4">'budget_scaled'</span><span class="s3">, </span><span class="s4">'revenue_scaled'</span><span class="s3">, </span><span class="s4">'runtime_scaled'</span><span class="s3">, </span><span class="s4">'popularity_scaled'</span><span class="s3">]</span>
+
+    <span class="s6"># Create subsets for training, validation, and testing.</span>
+    <span class="s1">x_train_num </span><span class="s2">= </span><span class="s1">X_train</span><span class="s3">[</span><span class="s1">numeric_features</span><span class="s3">]</span>
+    <span class="s1">x_val_num </span><span class="s2">= </span><span class="s1">X_val</span><span class="s3">[</span><span class="s1">numeric_features</span><span class="s3">]</span>
+    <span class="s1">x_test_num </span><span class="s2">= </span><span class="s1">X_test</span><span class="s3">[</span><span class="s1">numeric_features</span><span class="s3">]</span>
+
+    <span class="s6"># Create PolynomialFeatures of degree 4, transforming only the selected ones</span>
+    <span class="s1">poly </span><span class="s2">= </span><span class="s1">PolynomialFeatures</span><span class="s3">(</span><span class="s1">degree</span><span class="s2">=</span><span class="s7">4</span><span class="s3">, </span><span class="s1">include_bias</span><span class="s2">=False</span><span class="s3">)</span>
+    <span class="s1">x_train_poly </span><span class="s2">= </span><span class="s1">poly</span><span class="s3">.</span><span class="s1">fit_transform</span><span class="s3">(</span><span class="s1">x_train_num</span><span class="s3">)</span>
+    <span class="s1">x_val_poly </span><span class="s2">= </span><span class="s1">poly</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_val_num</span><span class="s3">)</span>
+    <span class="s1">x_test_poly </span><span class="s2">= </span><span class="s1">poly</span><span class="s3">.</span><span class="s1">transform</span><span class="s3">(</span><span class="s1">x_test_num</span><span class="s3">)</span>
+
+    <span class="s6"># Get the remaining non numeric features.</span>
+    <span class="s1">x_train_other </span><span class="s2">= </span><span class="s1">X_train</span><span class="s3">.</span><span class="s1">drop</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">numeric_features</span><span class="s3">)</span>
+    <span class="s1">x_val_other </span><span class="s2">= </span><span class="s1">X_val</span><span class="s3">.</span><span class="s1">drop</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">numeric_features</span><span class="s3">)</span>
+    <span class="s1">x_test_other </span><span class="s2">= </span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">drop</span><span class="s3">(</span><span class="s1">columns</span><span class="s2">=</span><span class="s1">numeric_features</span><span class="s3">)</span>
+
+    <span class="s6"># Combine polynomial numeric features with the rest.</span>
+    <span class="s1">x_train_final </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">hstack</span><span class="s3">([</span><span class="s1">x_train_poly</span><span class="s3">, </span><span class="s1">x_train_other</span><span class="s3">.</span><span class="s1">to_numpy</span><span class="s3">()])</span>
+    <span class="s1">x_val_final </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">hstack</span><span class="s3">([</span><span class="s1">x_val_poly</span><span class="s3">, </span><span class="s1">x_val_other</span><span class="s3">.</span><span class="s1">to_numpy</span><span class="s3">()])</span>
+    <span class="s1">x_test_final </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">hstack</span><span class="s3">([</span><span class="s1">x_test_poly</span><span class="s3">, </span><span class="s1">x_test_other</span><span class="s3">.</span><span class="s1">to_numpy</span><span class="s3">()])</span>
+
+    <span class="s6"># Train the model.</span>
+    <span class="s1">model</span><span class="s3">.</span><span class="s1">fit</span><span class="s3">(</span><span class="s1">x_train_final</span><span class="s3">, </span><span class="s1">y_train</span><span class="s3">)</span>
+
+    <span class="s6"># Predict on all three sets.</span>
+    <span class="s1">y_train_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">x_train_final</span><span class="s3">)</span>
+    <span class="s1">y_val_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">x_val_final</span><span class="s3">)</span>
+    <span class="s1">y_test_pred </span><span class="s2">= </span><span class="s1">model</span><span class="s3">.</span><span class="s1">predict</span><span class="s3">(</span><span class="s1">x_test_final</span><span class="s3">)</span>
+
+    <span class="s6"># Return all three predictions.</span>
+    <span class="s2">return </span><span class="s1">y_train_pred</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">, </span><span class="s1">y_test_pred</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s6"># Available models are:</span>
+<span class="s6"># 1. Linear Regression</span>
+<span class="s6"># 2. Ridge Regression</span>
+<span class="s6"># 3. Polynomial Regression</span>
+<span class="s6"># Execute all three models and store their predictions</span>
+
+<span class="s1">model_predictions </span><span class="s2">= </span><span class="s3">{}</span>
+
+<span class="s6"># Linear Regression</span>
+<span class="s1">y_train_pred_lr</span><span class="s3">, </span><span class="s1">y_val_pred_lr</span><span class="s3">, </span><span class="s1">y_test_pred_lr </span><span class="s2">= </span><span class="s1">execute_linear_regression</span><span class="s3">()</span>
+<span class="s1">model_predictions</span><span class="s3">[</span><span class="s4">'Linear Regression'</span><span class="s3">] </span><span class="s2">= </span><span class="s3">(</span><span class="s1">y_train_pred_lr</span><span class="s3">, </span><span class="s1">y_val_pred_lr</span><span class="s3">, </span><span class="s1">y_test_pred_lr</span><span class="s3">)</span>
+
+<span class="s6"># Ridge Regression</span>
+<span class="s1">y_train_pred_ridge</span><span class="s3">, </span><span class="s1">y_val_pred_ridge</span><span class="s3">, </span><span class="s1">y_test_pred_ridge </span><span class="s2">= </span><span class="s1">execute_ridge_regression</span><span class="s3">()</span>
+<span class="s1">model_predictions</span><span class="s3">[</span><span class="s4">'Ridge Regression'</span><span class="s3">] </span><span class="s2">= </span><span class="s3">(</span><span class="s1">y_train_pred_ridge</span><span class="s3">, </span><span class="s1">y_val_pred_ridge</span><span class="s3">, </span><span class="s1">y_test_pred_ridge</span><span class="s3">)</span>
+
+<span class="s6"># Polynomial Regression</span>
+<span class="s1">y_train_pred_poly</span><span class="s3">, </span><span class="s1">y_val_pred_poly</span><span class="s3">, </span><span class="s1">y_test_pred_poly </span><span class="s2">= </span><span class="s1">execute_polynomial_regression</span><span class="s3">()</span>
+<span class="s1">model_predictions</span><span class="s3">[</span><span class="s4">'Polynomial Regression'</span><span class="s3">] </span><span class="s2">= </span><span class="s3">(</span><span class="s1">y_train_pred_poly</span><span class="s3">, </span><span class="s1">y_val_pred_poly</span><span class="s3">, </span><span class="s1">y_test_pred_poly</span><span class="s3">)</span>
+
+
+<span class="s6"># Calculate and compare metrics for each model</span>
+<span class="s1">results_summary </span><span class="s2">= </span><span class="s3">[]</span>
+
+<span class="s2">for </span><span class="s1">model_name</span><span class="s3">, </span><span class="s1">predictions </span><span class="s2">in </span><span class="s1">model_predictions</span><span class="s3">.</span><span class="s1">items</span><span class="s3">()</span><span class="s2">:</span>
+    <span class="s1">y_train_pred</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">, </span><span class="s1">y_test_pred </span><span class="s2">= </span><span class="s1">predictions</span>
+
+    <span class="s6"># Clip predictions to the valid range [0, 10]</span>
+    <span class="s1">y_train_pred </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">y_train_pred</span><span class="s3">, </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+    <span class="s1">y_val_pred </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">y_val_pred</span><span class="s3">, </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+    <span class="s1">y_test_pred </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">y_test_pred</span><span class="s3">, </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+
+    <span class="s6"># Calculate R2 and MSE for each dataset</span>
+    <span class="s1">r2_train </span><span class="s2">= </span><span class="s1">r2_score</span><span class="s3">(</span><span class="s1">y_train</span><span class="s3">, </span><span class="s1">y_train_pred</span><span class="s3">)</span>
+    <span class="s1">mse_train </span><span class="s2">= </span><span class="s1">mean_squared_error</span><span class="s3">(</span><span class="s1">y_train</span><span class="s3">, </span><span class="s1">y_train_pred</span><span class="s3">)</span>
+
+    <span class="s1">r2_val </span><span class="s2">= </span><span class="s1">r2_score</span><span class="s3">(</span><span class="s1">y_val</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">)</span>
+    <span class="s1">mse_val </span><span class="s2">= </span><span class="s1">mean_squared_error</span><span class="s3">(</span><span class="s1">y_val</span><span class="s3">, </span><span class="s1">y_val_pred</span><span class="s3">)</span>
+
+    <span class="s1">r2_test </span><span class="s2">= </span><span class="s1">r2_score</span><span class="s3">(</span><span class="s1">y_test</span><span class="s3">, </span><span class="s1">y_test_pred</span><span class="s3">)</span>
+    <span class="s1">mse_test </span><span class="s2">= </span><span class="s1">mean_squared_error</span><span class="s3">(</span><span class="s1">y_test</span><span class="s3">, </span><span class="s1">y_test_pred</span><span class="s3">)</span>
+
+    <span class="s1">results_summary</span><span class="s3">.</span><span class="s1">append</span><span class="s3">({</span>
+        <span class="s4">'Model'</span><span class="s2">: </span><span class="s1">model_name</span><span class="s3">,</span>
+        <span class="s4">'Train R2'</span><span class="s2">: </span><span class="s1">r2_train</span><span class="s3">,</span>
+        <span class="s4">'Validation R2'</span><span class="s2">: </span><span class="s1">r2_val</span><span class="s3">,</span>
+        <span class="s4">'Test R2'</span><span class="s2">: </span><span class="s1">r2_test</span><span class="s3">,</span>
+        <span class="s4">'Train MSE'</span><span class="s2">: </span><span class="s1">mse_train</span><span class="s3">,</span>
+        <span class="s4">'Validation MSE'</span><span class="s2">: </span><span class="s1">mse_val</span><span class="s3">,</span>
+        <span class="s4">'Test MSE'</span><span class="s2">: </span><span class="s1">mse_test</span>
+    <span class="s3">})</span>
+
+<span class="s6"># Create a DataFrame for easy viewing</span>
+<span class="s1">results_df </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">DataFrame</span><span class="s3">(</span><span class="s1">results_summary</span><span class="s3">)</span>
+<span class="s1">display</span><span class="s3">(</span><span class="s1">results_df</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+</span><span class="s1">### 4. Discussion of Experimental Results 
+ 
+The table shows how well our three models performed. We look at two main scores: 
+*   **R2**: It shows how much of the variance our model explains. 
+*   **MSE**: MSE measures the average squared error between the model’s predictions and the true values. 
+ 
+#### Model Comparison 
+ 
+1.  **Linear &amp; Ridge Regression**: Both explain about 52% of the variance and have the average error ≈ 4.1 
+ 
+2.  **Polynomial Regression**: It performs much better, with Test R² ≈ 0.85 and MSE ≈ 1.33. 
+ 
+#### Our Observations 
+ 
+- With a R2 score of 0.85 our model can explain 85% of the variation in movie ratings. 
+- The average prediction error is about 1.15 points. 
+ 
+#### Our Conclusion 
+ 
+Based on the results, the Polynomial Regression model is the effective one. <hr class="ls0"></span><span class="s0">#%% 
+</span><span class="s6"># Create a DataFrame with predictions from all models, actuals, and titles.</span>
+<span class="s1">results </span><span class="s2">= </span><span class="s1">pd</span><span class="s3">.</span><span class="s1">DataFrame</span><span class="s3">({</span>
+    <span class="s6"># take the correct movie title</span>
+    <span class="s4">'title'</span><span class="s2">: </span><span class="s1">df</span><span class="s3">.</span><span class="s1">loc</span><span class="s3">[</span><span class="s1">X_test</span><span class="s3">.</span><span class="s1">index</span><span class="s3">, </span><span class="s4">'title'</span><span class="s3">],</span>
+    <span class="s4">'actual_rating'</span><span class="s2">: </span><span class="s1">y_test</span><span class="s3">,</span>
+    <span class="s4">'predicted_linear'</span><span class="s2">: </span><span class="s1">y_test_pred_lr</span><span class="s3">,</span>
+    <span class="s4">'predicted_ridge'</span><span class="s2">: </span><span class="s1">y_test_pred_ridge</span><span class="s3">,</span>
+    <span class="s4">'predicted_poly'</span><span class="s2">: </span><span class="s1">y_test_pred_poly</span>
+<span class="s3">})</span>
+
+<span class="s6"># Clip predictions to the valid range</span>
+<span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_linear'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_linear'</span><span class="s3">], </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">).</span><span class="s1">round</span><span class="s3">(</span><span class="s7">2</span><span class="s3">)</span>
+<span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_ridge'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_ridge'</span><span class="s3">], </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">).</span><span class="s1">round</span><span class="s3">(</span><span class="s7">2</span><span class="s3">)</span>
+<span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_poly'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">results</span><span class="s3">[</span><span class="s4">'predicted_poly'</span><span class="s3">], </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">).</span><span class="s1">round</span><span class="s3">(</span><span class="s7">2</span><span class="s3">)</span>
+<span class="s1">results</span><span class="s3">[</span><span class="s4">'actual_rating'</span><span class="s3">] </span><span class="s2">= </span><span class="s1">results</span><span class="s3">[</span><span class="s4">'actual_rating'</span><span class="s3">].</span><span class="s1">round</span><span class="s3">(</span><span class="s7">2</span><span class="s3">)</span>
+
+<span class="s6"># Filter out movies where the actual rating is 0.</span>
+<span class="s1">res_non_zero </span><span class="s2">= </span><span class="s1">results</span><span class="s3">[</span><span class="s1">results</span><span class="s3">[</span><span class="s4">'actual_rating'</span><span class="s3">] </span><span class="s2">&gt; </span><span class="s7">0</span><span class="s3">]</span>
+
+<span class="s6"># Show a random sample of 20 movies for comparison.</span>
+<span class="s1">sample_results </span><span class="s2">= </span><span class="s1">res_non_zero</span><span class="s3">.</span><span class="s1">sample</span><span class="s3">(</span><span class="s7">20</span><span class="s3">, </span><span class="s1">random_state</span><span class="s2">=</span><span class="s7">42</span><span class="s3">)</span>
+
+<span class="s1">display</span><span class="s3">(</span><span class="s1">sample_results</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s2">import </span><span class="s1">matplotlib</span><span class="s3">.</span><span class="s1">pyplot </span><span class="s2">as </span><span class="s1">plt</span>
+
+<span class="s6"># Create a figure with 3 subplots, one for each model</span>
+<span class="s6"># https://stackoverflow.com/questions/71160580/</span>
+<span class="s1">fig</span><span class="s3">, </span><span class="s1">axes </span><span class="s2">= </span><span class="s1">plt</span><span class="s3">.</span><span class="s1">subplots</span><span class="s3">(</span><span class="s7">1</span><span class="s3">, </span><span class="s7">3</span><span class="s3">, </span><span class="s1">figsize</span><span class="s2">=</span><span class="s3">(</span><span class="s7">24</span><span class="s3">, </span><span class="s7">6</span><span class="s3">), </span><span class="s1">sharey</span><span class="s2">=True</span><span class="s3">)</span>
+<span class="s1">fig</span><span class="s3">.</span><span class="s1">suptitle</span><span class="s3">(</span><span class="s4">'Predicted vs. Actual Ratings for Each Model'</span><span class="s3">, </span><span class="s1">fontsize</span><span class="s2">=</span><span class="s7">16</span><span class="s3">)</span>
+
+<span class="s6"># A dictionary to hold the test predictions for each model</span>
+<span class="s1">model_test_predictions </span><span class="s2">= </span><span class="s3">{</span>
+    <span class="s4">'Linear Regression'</span><span class="s2">: </span><span class="s1">y_test_pred_lr</span><span class="s3">,</span>
+    <span class="s4">'Ridge Regression'</span><span class="s2">: </span><span class="s1">y_test_pred_ridge</span><span class="s3">,</span>
+    <span class="s4">'Polynomial Regression'</span><span class="s2">: </span><span class="s1">y_test_pred_poly</span>
+<span class="s3">}</span>
+
+<span class="s6"># Loop through the models and create a plot for each</span>
+<span class="s2">for </span><span class="s1">ax</span><span class="s3">, (</span><span class="s1">model_name</span><span class="s3">, </span><span class="s1">y_pred</span><span class="s3">) </span><span class="s2">in </span><span class="s1">zip</span><span class="s3">(</span><span class="s1">axes</span><span class="s3">, </span><span class="s1">model_test_predictions</span><span class="s3">.</span><span class="s1">items</span><span class="s3">())</span><span class="s2">:</span>
+    <span class="s6"># Clip predictions to the valid range [0, 10]</span>
+    <span class="s1">y_pred_clipped </span><span class="s2">= </span><span class="s1">np</span><span class="s3">.</span><span class="s1">clip</span><span class="s3">(</span><span class="s1">y_pred</span><span class="s3">, </span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+
+    <span class="s6"># Create the scatter plot</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">scatter</span><span class="s3">(</span><span class="s1">y_test</span><span class="s3">, </span><span class="s1">y_pred_clipped</span><span class="s3">, </span><span class="s1">alpha</span><span class="s2">=</span><span class="s7">0.3</span><span class="s3">)</span>
+
+    <span class="s6"># Add the perfect prediction line</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">plot</span><span class="s3">([</span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">], [</span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">], </span><span class="s4">'r'</span><span class="s3">, </span><span class="s1">lw</span><span class="s2">=</span><span class="s7">2</span><span class="s3">)</span>
+
+    <span class="s6"># Set titles and labels</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_title</span><span class="s3">(</span><span class="s1">model_name</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_xlabel</span><span class="s3">(</span><span class="s4">&quot;Actual Ratings&quot;</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_ylabel</span><span class="s3">(</span><span class="s4">&quot;Predicted Ratings&quot;</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">grid</span><span class="s3">(</span><span class="s2">True</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_aspect</span><span class="s3">(</span><span class="s4">'equal'</span><span class="s3">, </span><span class="s1">adjustable</span><span class="s2">=</span><span class="s4">'box'</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_xlim</span><span class="s3">(</span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+    <span class="s1">ax</span><span class="s3">.</span><span class="s1">set_ylim</span><span class="s3">(</span><span class="s7">0</span><span class="s3">, </span><span class="s7">10</span><span class="s3">)</span>
+
+<span class="s1">plt</span><span class="s3">.</span><span class="s1">tight_layout</span><span class="s3">(</span><span class="s1">rect</span><span class="s2">=</span><span class="s3">[</span><span class="s7">0</span><span class="s3">, </span><span class="s7">0.03</span><span class="s3">, </span><span class="s7">1</span><span class="s3">, </span><span class="s7">0.95</span><span class="s3">])</span>
+<span class="s1">plt</span><span class="s3">.</span><span class="s1">show</span><span class="s3">()</span></pre>
+</body>
+</html>
